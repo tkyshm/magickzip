@@ -1,0 +1,13 @@
+structure:
+  package:
+    01_image:
+      - image_*.png
+    02_cover:
+      - cover_*.png
+    03_tab:
+      - tab_*.png
+    04_sample:
+      test:
+        - file*
+      test2:
+        - file*

@@ -1,0 +1,23 @@
+resize:
+  01_image:
+    height: 100
+    width:  100
+
+modulate:
+  10_black: 0
+
+structure:
+  package:
+    01_image:
+      - image_*.png
+    02_cover:
+      - cover_*.png
+    03_tab:
+      - tab_*.png
+    04_sample:
+      test:
+        - file*
+      test2:
+        - file*
+    10_black:
+      - image_*.png
