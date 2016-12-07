@@ -14,45 +14,35 @@ import (
 )
 
 var (
-	conf     string
+	template string
 	inputDir string
 	config   *magickzip.Config
 )
 
 func main() {
-	flag.StringVar(&conf, "conf", "~/.config/magickzip/conf.yml", "conf file")
+	flag.StringVar(&template, "template", "~/.config/magickzip/template.yml", "template file")
 	flag.StringVar(&inputDir, "input-dir", "./input", "input directory has images")
 	flag.Parse()
 
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
+
 	var err error
-	config, err = magickzip.LoadConfig(conf)
+	config, err = magickzip.LoadConfig(template)
 	if err != nil {
 		panic(err)
 	}
 
-	// 1. make base structure
-	makeStructure(config.Structure, ".")
-
-	// 2. modulating files
-	for dir, m := range config.Modulate {
-		// TODO: dirの中の画像をmの値でmodulate
-		log.Printf("directory:%s, modulate:%d%%", dir, m)
-	}
-
-	// 3. resize files
-	startResize(config.Resize)
-	for dir, params := range config.Resize {
-		log.Printf("directory:%s, params:%v", dir, params)
-	}
-
 	imagick.Initialize()
 	defer imagick.Terminate()
+
+	// 1. make base structure
+	makeStructure(config.Structure, ".")
 }
 
 func makeStructure(list map[interface{}]interface{}, parent string) {
 	for dir, content := range list {
 		// chain path
-		path := fmt.Sprintf("%s/%s", parent, dir.(string))
+		path := fmt.Sprintf("%s/%s", parent, dir)
 		_, err := os.Stat(path)
 		if os.IsNotExist(err) {
 			log.Println("make directory:", dir)
@@ -66,7 +56,6 @@ func makeStructure(list map[interface{}]interface{}, parent string) {
 		case []interface{}: // files
 			for _, r := range content.([]interface{}) {
 				rpath := fmt.Sprintf("%s/%s", inputDir, r)
-				log.Println(rpath)
 				files, err := filepath.Glob(rpath)
 				if err != nil {
 					continue
@@ -82,22 +71,57 @@ func makeStructure(list map[interface{}]interface{}, parent string) {
 					}
 
 					// Destiation
-					dstFile := fmt.Sprintf("%s/%s", path, filepath.Base(srcFile))
-					dst, err := os.Create(dstFile)
-					if err != nil {
-						log.Println("[error] ", err)
-						continue
-					}
+					basename := filepath.Base(srcFile)
+					dstFile := fmt.Sprintf("%s/%s", path, basename)
 
-					// Copy file
-					_, err = io.Copy(dst, src)
-					if err != nil {
-						log.Println("[error] ", err)
-						continue
-					}
+					// TODO: check resize
+					if isResizeDir(dir.(string)) {
+						for subdir, size := range config.Resize[dir].(map[interface{}]interface{}) {
+							resizePath := fmt.Sprintf("%s/%s", path, subdir)
+							if _, err := os.Stat(resizePath); os.IsNotExist(err) {
+								err := os.Mkdir(resizePath, 0755)
+								if err != nil {
+									log.Println("[error] ", err)
+									continue
+								}
+							}
+							h := size.(map[interface{}]interface{})[string("height")]
+							w := size.(map[interface{}]interface{})[string("width")]
+							log.Printf("height:%d, width:%d", h, w)
+							dstFile = fmt.Sprintf("%s/%s", resizePath, basename)
+							log.Println("start resize: ", dstFile)
+							err := resize(h.(int), w.(int), dstFile, srcFile)
+							if err != nil {
+								log.Println("[error] ", err)
+								continue
+							}
+						}
+					} else {
+						dst, err := os.Create(dstFile)
+						if err != nil {
+							log.Println("[error] ", err)
+							continue
+						}
 
+						_, err = io.Copy(dst, src)
+						if err != nil {
+							log.Println("[error] ", err)
+							continue
+						}
+						dst.Close()
+					}
 					src.Close()
-					dst.Close()
+
+					if isModulateDir(dir.(string)) {
+						log.Println("start modulate: ", dstFile)
+						m := config.Modulate[dir]
+						err := modulate(m.(int), dstFile, srcFile)
+						if err != nil {
+							log.Println("[error] ", err)
+							continue
+						}
+					}
+
 				}
 			}
 		case map[interface{}]interface{}: // directory
@@ -109,58 +133,65 @@ func makeStructure(list map[interface{}]interface{}, parent string) {
 	}
 }
 
-func startResize(list map[interface{}]interface{}) {
-	for dir, params := range list {
-		for subdir, size := range params.(map[interface{}]interface{}) {
-			// check resize params struct
-			switch t := size.(type) {
-			case map[interface{}]interface{}:
-				files, err := filepath.Glob("./" + config.Root + "/*" + dir.(string))
-				if err != nil {
-					log.Println("[error] ", err)
-					continue
-				}
-				// all paths
-				for _, path := range files {
-					dstPath := fmt.Sprintf("%s/%s", path, subdir)
-
-					// mkdir if not exist directory
-					if _, err := os.Stat(dstPath); os.IsNotExist(err) {
-						err := os.Mkdir(dstPath, 0755)
-						if err != nil {
-							log.Println("[error] ", err)
-							continue
-						}
-					}
-
-					// find image files
-					imgs, err := filepath.Glob(path + "/*")
-					if err != nil {
-						log.Println("[error] ", err)
-						continue
-					}
-
-					// resize
-					for _, img := range imgs {
-						// TODO: resize
-						//h := size.(map[interface{}]interface{})[string("height")]
-						//w := size.(map[interface{}]interface{})[string("width")]
-						// only file
-						fi, _ := os.Stat(img)
-						// skip directory
-						if fi.IsDir() {
-							continue
-						}
-						// dst: path+subdir, src: path/**
-						fmt.Println(img)
-					}
-				}
-
-			default:
-				log.Printf("[error] unexpected type: %T", t)
-				log.Println("[error] content: ", size)
-			}
+func isResizeDir(d string) bool {
+	for dir := range config.Resize {
+		if dir.(string) == d {
+			return true
 		}
-		log.Printf("directory:%s, params:%+v", dir, params)
 	}
+	return false
+}
+
+func isModulateDir(d string) bool {
+	for dir := range config.Modulate {
+		if dir.(string) == d {
+			return true
+		}
+	}
+	return false
+}
+
+func resize(cols, rows int, dstFile, srcFile string) error {
+	mw := imagick.NewMagickWand()
+	defer mw.Destroy()
+
+	err := mw.ReadImage(srcFile)
+	if err != nil {
+		return err
+	}
+
+	err = mw.AdaptiveResizeImage(uint(cols), uint(rows))
+	if err != nil {
+		return err
+	}
+
+	// write image
+	err = mw.WriteImage(dstFile)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func modulate(mod int, dstFile, srcFile string) error {
+	mw := imagick.NewMagickWand()
+	defer mw.Destroy()
+
+	err := mw.ReadImage(srcFile)
+	if err != nil {
+		return err
+	}
+
+	err = mw.ModulateImage(float64(mod), 100, 100)
+	if err != nil {
+		return err
+	}
+
+	err = mw.WriteImage(dstFile)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
