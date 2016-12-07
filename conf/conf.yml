@@ -9,9 +9,8 @@ resize:
       height: 200
       width:  200
   10_black:
-    w100:
-      height: 100
-      width:  100
+    height: 100
+    width:  100
 
 modulate:
   10_black: 0
