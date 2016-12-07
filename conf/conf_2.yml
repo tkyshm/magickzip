@@ -1,0 +1,45 @@
+enable_webp: true
+
+resize:
+  01_image:
+    w100:
+      height: 100
+      width:  100
+    w200:
+      height: 200
+      width:  200
+  10_black:
+    height: 100
+    width:  100
+
+modulate:
+  10_black: 0
+
+structure:
+  package_2:
+    package_2_subdir:
+      001_xxx:
+        01_image:
+          - image_01.png
+        10_black:
+          - image_01.png
+      002_xxx:
+        01_image:
+          - image_02.png
+        10_black:
+          - image_02.png
+      003_xxx:
+        01_image:
+          - image_03.png
+        10_black:
+          - image_03.png
+      004_xxx:
+        01_image:
+          - image_04.png
+        10_black:
+          - image_04.png
+      008_xxx:
+        01_image:
+          - image_08.png
+        10_black:
+          - image_08.png

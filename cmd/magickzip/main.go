@@ -36,6 +36,7 @@ func main() {
 
 	// 1. make base structure
 	makeStructure(config.Structure, ".")
+	cleanEmptyDir("./" + config.Root)
 }
 
 func makeStructure(list map[interface{}]interface{}, parent string) {
@@ -246,4 +247,8 @@ func modulate(mod int, dstFile, srcFile string) error {
 	}
 
 	return nil
+}
+
+func cleanEmptyDir(root string) {
+	os.RemoveAll(root)
 }
