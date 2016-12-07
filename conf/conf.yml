@@ -1,7 +1,17 @@
+enable_webp: true
+
 resize:
   01_image:
-    height: 100
-    width:  100
+    w100:
+      height: 100
+      width:  100
+    w200:
+      height: 100
+      width:  100
+  10_black:
+    w100:
+      height: 100
+      width:  100
 
 modulate:
   10_black: 0
@@ -13,11 +23,7 @@ structure:
     02_cover:
       - cover_*.png
     03_tab:
-      - tab_*.png
-    04_sample:
-      test:
-        - file*
-      test2:
-        - file*
+      - tab_on.png
+      - tab.png
     10_black:
       - image_*.png
