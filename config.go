@@ -1,4 +1,4 @@
-package main
+package magickzip
 
 import (
 	"io/ioutil"
@@ -8,12 +8,12 @@ import (
 
 type Config struct {
 	Structure Structure
-	Resize    map[string][]string
-	Modulate  map[string][]string
+	Resize    map[string]interface{}
+	Modulate  map[string]interface{}
 }
 
 type Structure struct {
-	Tree map[string][]string
+	Tree map[string]interface{}
 }
 
 func LoadConfig(file string) (*Config, error) {
